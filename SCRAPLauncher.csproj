@@ -133,9 +133,6 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Resource Include="SCREP %281%29.png" />
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell -Command "if (Test-Path 'C:\Users\harlo\source\repos\ScrapLauncher\ScrapLauncher.zip') { Remove-Item 'C:\Users\harlo\source\repos\ScrapLauncher\ScrapLauncher.zip' -Force }; Compress-Archive -Path 'C:\Users\harlo\source\repos\ScrapLauncher\bin\Debug' -DestinationPath 'C:\Users\harlo\source\repos\ScrapLauncher\ScrapLauncher.zip' -Force"
