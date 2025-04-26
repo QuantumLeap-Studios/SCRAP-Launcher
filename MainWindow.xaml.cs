@@ -7,6 +7,8 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
+using static System.Net.WebRequestMethods;
+using File = System.IO.File;
 
 namespace SCRAPLauncher
 {
@@ -14,37 +16,16 @@ namespace SCRAPLauncher
     {
         private
         const string GitHubReleasesApiUrl = "https://api.github.com/repos/QuantumLeap-Studios/SCRAP_GameFiles/releases";
+        const string GitHubReleasesApiUrlForLauncher = "https://api.github.com/repos/QuantumLeap-Studios/SCRAP-Launcher/releases";
         private
         const string UserAgent = "SCRAPLauncher";
         private string _downloadUrl;
 
+        public Version LauncherVersion = new Version(2, 0, 1);
+
         public MainWindow()
         {
             InitializeComponent();
-        }
-
-        private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var releases = await FetchReleasesAsync();
-                var latestRelease = releases.FirstOrDefault(r => !string.IsNullOrEmpty(r.name) && r.name.ToLower().Contains("(release)"));
-
-                if (latestRelease != null)
-                {
-                    _downloadUrl = latestRelease.assets.FirstOrDefault()?.browser_download_url;
-                    InstallGameButton.IsEnabled = !string.IsNullOrEmpty(_downloadUrl);
-                    MessageBox.Show($"Latest release: {latestRelease.name}\nPublished at: {latestRelease.published_at}", "Update Info", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    MessageBox.Show("No releases found.", "Update Info", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error checking for updates: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
 
         private async void InstallGameButton_Click(object sender, RoutedEventArgs e)
@@ -162,12 +143,12 @@ namespace SCRAPLauncher
             Application.Current.Shutdown();
         }
 
-        private async Task<List<Release>> FetchReleasesAsync()
+        private async Task<List<Release>> FetchReleasesAsync(bool isLauncher = false)
         {
             using (var client = new HttpClient())
             {
                 client.DefaultRequestHeaders.Add("User-Agent", UserAgent); // Add User-Agent header to avoid GitHub API rejection
-                var response = await client.GetAsync(GitHubReleasesApiUrl);
+                var response = await client.GetAsync(!isLauncher ? GitHubReleasesApiUrl : GitHubReleasesApiUrlForLauncher);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -228,6 +209,55 @@ namespace SCRAPLauncher
         {
             try
             {
+                var launcherReleases = await FetchReleasesAsync(true);
+                var latestLauncherRelease = launcherReleases?
+                    .OrderByDescending(r => DateTime.Parse(r.published_at))
+                    .FirstOrDefault();
+
+                if (latestLauncherRelease != null)
+                {
+                    // Get the current and latest versions
+                    var currentVersion = LauncherVersion;
+                    var latestVersion = new Version(latestLauncherRelease.name);
+
+                    if (currentVersion != null && latestVersion != null)
+                    {
+                        if (latestVersion > currentVersion)
+                        {
+                            var result = MessageBox.Show(
+                                $"A new version ({latestVersion}) is available for the launcher. Do you want to download it?",
+                                "Update Available",
+                                MessageBoxButton.YesNo,
+                                MessageBoxImage.Information
+                            );
+
+                            if (result == MessageBoxResult.Yes)
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = "https://github.com/QuantumLeap-Studios/SCRAP-Launcher/releases/latest",
+                                    UseShellExecute = true
+                                });
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show(
+                                "You are using the latest version.",
+                                "No Update Available",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information
+                            );
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error checking for updates: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            try
+            {
                 LoadingText.Text = "Loading versions...";
                 var releases = await FetchReleasesAsync();
                 Console.WriteLine($"Releases fetched: {releases?.Count}");
@@ -257,6 +287,11 @@ namespace SCRAPLauncher
                 PlayButton.IsEnabled = false;
             }
         }
+        private void PlayGameButton_Click(object sender, RoutedEventArgs e)
+        {
+            LaunchGame();
+            Application.Current.Shutdown();
+        }
 
         private class Release
         {
@@ -284,12 +319,6 @@ namespace SCRAPLauncher
                 get;
                 set;
             }
-        }
-
-        private void PlayGameButton_Click(object sender, RoutedEventArgs e)
-        {
-            LaunchGame();
-            Application.Current.Shutdown();
         }
     }
 }
